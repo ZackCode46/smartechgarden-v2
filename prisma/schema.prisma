@@ -1,0 +1,214 @@
+// Smartech Garden 2.0 — Database Schema
+// Postgres (Neon) via Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ================= AUTH =================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String? // null kalau login via OAuth
+  image         String?
+  role          Role      @default(USER)
+  bio           String?
+  location      String?
+  phone         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  devices        Device[]
+  plantChecks    PlantCheck[]
+  notifications  Notification[]
+  settings       UserSettings?
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model UserSettings {
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tempUnit           String  @default("celsius") // celsius | fahrenheit
+  notifyDrySoil      Boolean @default(true)
+  notifyHighTemp     Boolean @default(true)
+  notifyLowLight     Boolean @default(false)
+  dryThreshold       Int     @default(30)
+  highTempThreshold  Int     @default(35)
+  theme              String  @default("kebun-siang") // kebun-siang | kebun-malam
+  language           String  @default("id")
+
+  @@map("user_settings")
+}
+
+// ================= DEVICE / GARDEN =================
+
+model Device {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String   @default("Kebun Utama")
+  deviceKey   String   @unique // dipakai ESP32 buat autentikasi POST data
+  ssid        String?
+  ipAddress   String?
+  isOnline    Boolean  @default(false)
+  lastSeenAt  DateTime?
+  mode        Mode     @default(MANUAL)
+  pumpState   Boolean  @default(false)
+  timerEnable Boolean  @default(false)
+  timerStart  String   @default("06:00")
+  timerEnd    String   @default("06:10")
+
+  createdAt DateTime @default(now())
+
+  readings    SensorReading[]
+  plantChecks PlantCheck[]
+
+  @@map("devices")
+}
+
+enum Mode {
+  AUTO
+  MANUAL
+}
+
+model SensorReading {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  suhu        Float // celsius
+  kelembaban  Float // % udara
+  tanah       Float // % kelembaban tanah (sudah dikalibrasi)
+  tanahRaw    Int? // nilai analog mentah dari sensor
+  cahaya      Float // lux
+  pumpActive  Boolean  @default(false)
+  recordedAt  DateTime @default(now())
+
+  @@index([deviceId, recordedAt])
+  @@map("sensor_readings")
+}
+
+// ================= E-BOOK / KATALOG TANAMAN =================
+
+model PlantSpecies {
+  id           String   @id @default(cuid())
+  nama         String
+  namaLatin    String?
+  slug         String   @unique
+  gambar       String
+  jenis        String // sayur | buah | hias | rempah
+  deskripsi    String   @db.Text
+  perawatan    String   @db.Text
+  suhuMin      Float?
+  suhuMax      Float?
+  kelembabanMin Float?
+  kelembabanMax Float?
+  kebutuhanCahaya String? // rendah | sedang | tinggi
+  masaPanen    String? // ex "60-80 hari"
+  createdAt    DateTime @default(now())
+
+  plantChecks PlantCheck[]
+
+  @@map("plant_species")
+}
+
+// ================= PEMERIKSAAN TANAMAN (Python/OpenCV service) =================
+
+model PlantCheck {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId      String?
+  device        Device?       @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  speciesId     String?
+  species       PlantSpecies? @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+
+  imageUrl      String
+  healthScore   Float // 0-100, dihitung dari analisis warna daun (Python)
+  healthLabel   String // "Sehat" | "Perlu Perhatian" | "Stres/Sakit"
+  ripenessScore Float? // khusus buah, 0-100
+  ripenessLabel String? // "Belum Matang" | "Matang" | "Terlalu Matang"
+  greenRatio    Float? // rasio piksel hijau sehat
+  yellowRatio   Float? // rasio piksel kuning (indikasi kekurangan nutrisi)
+  brownRatio    Float? // rasio piksel coklat (indikasi layu/sakit)
+  notes         String?  @db.Text // rekomendasi otomatis dari service Python
+  rawAnalysis   Json? // payload lengkap dari FastAPI buat debugging/audit
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("plant_checks")
+}
+
+// ================= NOTIFIKASI =================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // dry_soil | high_temp | low_light | plant_check | system
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}

@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-fraunces: "Fraunces", serif;
+  --font-worksans: "Work Sans", sans-serif;
+  --font-plexmono: "IBM Plex Mono", monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #E8E1CC;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(35,48,29,0.07) 1px, transparent 0);
+  background-size: 18px 18px;
+  color: #23301D;
+}
+
+/* ===== Seed-packet card: torn top edge + stitched border ===== */
+.seed-card {
+  position: relative;
+  background: #F4EEDF;
+  border-radius: 14px;
+  box-shadow: 0 2px 0 rgba(35,48,29,0.08), 0 12px 24px -14px rgba(35,48,29,0.35);
+  border: 1.5px dashed rgba(35,48,29,0.18);
+}
+
+.seed-card::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 10px;
+  pointer-events: none;
+  border: 1px solid rgba(35,48,29,0.06);
+}
+
+/* Plant marker stake tab, used for nav labels */
+.stake-tab {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 88%, 0 100%);
+}
+
+/* ===== Gauge dial signature element ===== */
+.gauge-ring {
+  transition: stroke-dashoffset 700ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gauge-needle {
+  transform-origin: 60px 60px;
+  transition: transform 700ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gauge-ring, .gauge-needle, * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+.input-field {
+  width: 100%;
+  border: 1.5px solid rgba(35,48,29,0.15);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.925rem;
+  color: #23301D;
+}
+.input-field:focus {
+  border-color: #3F6B3D;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(63,107,61,0.15);
+}
+
+/* Focus visibility */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #B8862E;
+  outline-offset: 2px;
+}
+
+/* Scrollbar tuned to theme */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #E8E1CC; }
+::-webkit-scrollbar-thumb { background: #B0A57E; border-radius: 8px; }
