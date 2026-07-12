@@ -1,16 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthAccountNotLinked:
+    "Email ini sudah terdaftar lewat cara login lain. Coba masuk pakai email & kata sandi, atau hubungi admin.",
+  OAuthSignin: "Gagal memulai proses login. Coba lagi beberapa saat.",
+  OAuthCallback: "Gagal memproses respons dari penyedia login (Google/Facebook). Coba lagi.",
+  AccessDenied: "Akses ditolak oleh penyedia login.",
+  Configuration: "Konfigurasi login bermasalah. Hubungi admin.",
+};
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    if (oauthError) {
+      setError(OAUTH_ERROR_MESSAGES[oauthError] ?? `Gagal login (${oauthError}). Coba lagi.`);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
