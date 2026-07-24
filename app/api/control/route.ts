@@ -37,3 +37,29 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ device: updated });
 }
+
+// ===== ESP32 → server: ambil mode & status pompa terbaru =====
+// Dipanggil oleh firmware pakai deviceKey (bukan session), supaya
+// perintah yang diklik user di dashboard (lewat POST di atas) bisa
+// benar-benar sampai dan diterapkan ke relay di alat.
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const deviceKey = searchParams.get("deviceKey");
+
+  if (!deviceKey) {
+    return NextResponse.json({ error: "deviceKey wajib diisi" }, { status: 400 });
+  }
+
+  const device = await prisma.device.findUnique({ where: { deviceKey } });
+  if (!device) {
+    return NextResponse.json({ error: "Device key tidak dikenali" }, { status: 401 });
+  }
+
+  return NextResponse.json({
+    mode: device.mode,
+    pumpState: device.pumpState,
+    timerEnable: device.timerEnable,
+    timerStart: device.timerStart,
+    timerEnd: device.timerEnd,
+  });
+}
