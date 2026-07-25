@@ -205,12 +205,15 @@ export default function DashboardClient({ userName }: { userName: string }) {
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(35,48,29,0.1)" />
                   <XAxis dataKey="time" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
+                  {/* Sumbu kiri: Suhu (°C), Kelembaban (%), Tanah (%) — semua range 0-100an */}
+                  <YAxis yAxisId="left" tick={{ fontSize: 11 }} domain={[0, 100]} />
+                  {/* Sumbu kanan: Cahaya (lux) — range 0-10000, dipisah biar gak "menenggelamkan" garis lain */}
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} domain={[0, 10000]} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="Suhu" stroke="#A6472F" dot={false} strokeWidth={2} />
-                  <Line type="monotone" dataKey="Kelembaban" stroke="#3E6E85" dot={false} strokeWidth={2} />
-                  <Line type="monotone" dataKey="Tanah" stroke="#3F6B3D" dot={false} strokeWidth={2} />
-                  <Line type="monotone" dataKey="Cahaya" stroke="#B8862E" dot={false} strokeWidth={2} />
+                  <Line yAxisId="left" type="monotone" dataKey="Suhu" stroke="#A6472F" dot={false} strokeWidth={2} />
+                  <Line yAxisId="left" type="monotone" dataKey="Kelembaban" stroke="#3E6E85" dot={false} strokeWidth={2} />
+                  <Line yAxisId="left" type="monotone" dataKey="Tanah" stroke="#3F6B3D" dot={false} strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="Cahaya" stroke="#B8862E" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             )}
