@@ -118,8 +118,9 @@ model Device {
 
   createdAt DateTime @default(now())
 
-  readings    SensorReading[]
-  plantChecks PlantCheck[]
+  readings          SensorReading[]
+  plantChecks       PlantCheck[]
+  wateringSchedules WateringSchedule[]
 
   @@map("devices")
 }
@@ -127,6 +128,23 @@ model Device {
 enum Mode {
   AUTO
   MANUAL
+}
+
+// Jadwal siram otomatis (banyak slot per hari), dipakai saat Device.mode = AUTO.
+// durationSec adalah proxy "debit air" — alat belum punya sensor flow,
+// jadi volume air didekati lewat lama pompa menyala.
+model WateringSchedule {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  hour        Int      // 0-23
+  minute      Int      // 0-59
+  durationSec Int      @default(30)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([deviceId])
+  @@map("watering_schedules")
 }
 
 model SensorReading {
