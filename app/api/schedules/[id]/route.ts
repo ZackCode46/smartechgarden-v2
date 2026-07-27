@@ -13,7 +13,7 @@ export async function DELETE(
   }
 
   try {
-    const schedule = await prisma.schedule.findUnique({
+    const schedule = await prisma.wateringSchedule.findUnique({
       where: { id: params.id },
       include: { device: true },
     });
@@ -21,10 +21,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
     }
 
-    await prisma.schedule.delete({ where: { id: params.id } });
+    await prisma.wateringSchedule.delete({ where: { id: params.id } });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[DELETE /api/schedule/:id]", err);
+    console.error("[DELETE /api/schedules/:id]", err);
     return NextResponse.json({ error: "Gagal menghapus jadwal" }, { status: 500 });
   }
 }
@@ -40,7 +40,7 @@ export async function PATCH(
 
   try {
     const { enabled } = await req.json();
-    const schedule = await prisma.schedule.findUnique({
+    const schedule = await prisma.wateringSchedule.findUnique({
       where: { id: params.id },
       include: { device: true },
     });
@@ -48,13 +48,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
     }
 
-    const updated = await prisma.schedule.update({
+    const updated = await prisma.wateringSchedule.update({
       where: { id: params.id },
       data: { enabled },
     });
     return NextResponse.json({ ok: true, schedule: updated });
   } catch (err) {
-    console.error("[PATCH /api/schedule/:id]", err);
+    console.error("[PATCH /api/schedules/:id]", err);
     return NextResponse.json({ error: "Gagal update jadwal" }, { status: 500 });
   }
 }
