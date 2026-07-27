@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// GET — dipanggil FIRMWARE tiap 5 detik (bukan dashboard, jadi tanpa session)
 export async function GET(req: NextRequest) {
   const deviceKey = req.nextUrl.searchParams.get("deviceKey");
   if (!deviceKey) {
@@ -14,7 +13,7 @@ export async function GET(req: NextRequest) {
     const device = await prisma.device.findUnique({
       where: { deviceKey },
       include: {
-        schedules: { where: { enabled: true }, orderBy: { hour: "asc" } },
+        wateringSchedules: { where: { enabled: true }, orderBy: { hour: "asc" } },
       },
     });
 
@@ -30,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       mode: device.mode,
       pumpState: device.pumpState,
-      schedules: device.schedules.map((s) => ({
+      schedules: device.wateringSchedules.map((s) => ({
         hour: s.hour,
         minute: s.minute,
         durationSec: s.durationSec,
@@ -43,7 +42,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST — dipanggil DASHBOARD buat ganti mode / pompa manual
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
