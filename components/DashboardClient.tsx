@@ -21,12 +21,34 @@ type Device = {
   ssid: string | null;
 };
 
+type Schedule = {
+  id: string;
+  hour: number;
+  minute: number;
+  durationSec: number;
+  enabled: boolean;
+};
+
 export default function DashboardClient({ userName }: { userName: string }) {
   const [device, setDevice] = useState<Device | null>(null);
   const [latest, setLatest] = useState<Reading | null>(null);
   const [history, setHistory] = useState<Reading[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [newHour, setNewHour] = useState(6);
+  const [newMinute, setNewMinute] = useState(0);
+  const [newDuration, setNewDuration] = useState(30);
+
+  const loadSchedules = useCallback(async () => {
+    try {
+      const res = await fetch("/api/schedules", { cache: "no-store" });
+      const data = await res.json();
+      setSchedules(data.schedules ?? []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -44,9 +66,10 @@ export default function DashboardClient({ userName }: { userName: string }) {
 
   useEffect(() => {
     load();
+    loadSchedules();
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, loadSchedules]);
 
   async function setMode(mode: "AUTO" | "MANUAL") {
     setBusy(true);
@@ -67,6 +90,35 @@ export default function DashboardClient({ userName }: { userName: string }) {
       body: JSON.stringify({ pumpState }),
     });
     await load();
+    setBusy(false);
+  }
+
+  async function addSchedule() {
+    setBusy(true);
+    await fetch("/api/schedules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hour: newHour, minute: newMinute, durationSec: newDuration }),
+    });
+    await loadSchedules();
+    setBusy(false);
+  }
+
+  async function toggleSchedule(id: string, enabled: boolean) {
+    setBusy(true);
+    await fetch(`/api/schedules/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    await loadSchedules();
+    setBusy(false);
+  }
+
+  async function deleteSchedule(id: string) {
+    setBusy(true);
+    await fetch(`/api/schedules/${id}`, { method: "DELETE" });
+    await loadSchedules();
     setBusy(false);
   }
 
@@ -194,6 +246,96 @@ export default function DashboardClient({ userName }: { userName: string }) {
               <span className="font-medium">{device?.pumpState ? "Menyala" : "Mati"}</span>
               {device?.mode === "AUTO" && " (otomatis berdasarkan kelembaban tanah < 30%)"}
             </p>
+          </section>
+
+          <section className="seed-card p-6 mb-8">
+            <h2 className="font-display text-lg font-semibold mb-1">Jadwal Siram Otomatis</h2>
+            <p className="text-xs text-ink/50 mb-4">
+              Jadwal ini hanya jalan saat Mode Otomatis aktif. Durasi = perkiraan "debit" (makin lama pompa
+              nyala, makin banyak air keluar) — alat belum punya sensor volume air.
+            </p>
+
+            {schedules.length === 0 ? (
+              <p className="text-ink/50 text-sm mb-4">Belum ada jadwal siram.</p>
+            ) : (
+              <ul className="space-y-2 mb-4">
+                {schedules.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 border border-ink/10 rounded-lg px-3 py-2"
+                  >
+                    <span className="text-sm">
+                      🕒 {String(s.hour).padStart(2, "0")}:{String(s.minute).padStart(2, "0")} —{" "}
+                      {s.durationSec} detik
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        disabled={busy}
+                        onClick={() => toggleSchedule(s.id, !s.enabled)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium border ${
+                          s.enabled ? "bg-moss text-canvas border-moss" : "border-ink/15"
+                        }`}
+                      >
+                        {s.enabled ? "Aktif" : "Nonaktif"}
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => deleteSchedule(s.id)}
+                        className="px-3 py-1 rounded-md text-xs font-medium border border-ink/15 hover:bg-ink/5"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col text-xs text-ink/60">
+                Jam
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={newHour}
+                  onChange={(e) => setNewHour(Number(e.target.value))}
+                  className="w-16 border border-ink/15 rounded-md px-2 py-1 mt-1"
+                />
+              </label>
+              <label className="flex flex-col text-xs text-ink/60">
+                Menit
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={newMinute}
+                  onChange={(e) => setNewMinute(Number(e.target.value))}
+                  className="w-16 border border-ink/15 rounded-md px-2 py-1 mt-1"
+                />
+              </label>
+              <label className="flex flex-col text-xs text-ink/60">
+                Durasi (detik)
+                <input
+                  type="number"
+                  min={1}
+                  max={3600}
+                  value={newDuration}
+                  onChange={(e) => setNewDuration(Number(e.target.value))}
+                  className="w-24 border border-ink/15 rounded-md px-2 py-1 mt-1"
+                />
+              </label>
+              <button
+                disabled={busy || schedules.length >= 10}
+                onClick={addSchedule}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-moss text-canvas"
+              >
+                + Tambah Jadwal
+              </button>
+            </div>
+            {schedules.length >= 10 && (
+              <p className="text-xs text-clay mt-2">Maksimal 10 jadwal per alat.</p>
+            )}
           </section>
 
           <section className="seed-card p-6">
