@@ -62,6 +62,7 @@ export async function POST(req: Request) {
   // dari device user (kalau ada) =====
   let speciesMatch = null as null | { id: string; nama: string };
   let envComparison: string | null = null;
+  let matchedDeviceId: string | null = null;
 
   if (species && species.trim().length > 0) {
     const matched = await prisma.plantSpecies.findFirst({
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
       speciesMatch = { id: matched.id, nama: matched.nama };
 
       const device = await prisma.device.findFirst({ where: { userId } });
+      matchedDeviceId = device?.id ?? null;
       const latestReading = device
         ? await prisma.sensorReading.findFirst({
             where: { deviceId: device.id },
@@ -115,6 +117,7 @@ export async function POST(req: Request) {
   const saved = await prisma.plantCheck.create({
     data: {
       userId,
+      deviceId: matchedDeviceId,
       speciesId: speciesMatch?.id ?? null,
       imageUrl: "",
       healthScore: analysis.healthScore,
