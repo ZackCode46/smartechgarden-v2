@@ -90,8 +90,16 @@ export async function GET() {
     take: 20,
   });
 
+  // isOnline dihitung dari lastSeenAt, bukan dipercaya dari kolom statis di DB —
+  // ESP32 upload tiap 10-30 detik, kalau lebih dari 60 detik gak ada kabar,
+  // anggap offline (kabel lepas, WiFi mati, dsb), meski dulu pernah online.
+  const ONLINE_THRESHOLD_MS = 60_000;
+  const isOnline = device.lastSeenAt
+    ? Date.now() - new Date(device.lastSeenAt).getTime() < ONLINE_THRESHOLD_MS
+    : false;
+
   return NextResponse.json({
-    device,
+    device: { ...device, isOnline },
     latest: history[0] ?? null,
     history: history.reverse(),
   });
