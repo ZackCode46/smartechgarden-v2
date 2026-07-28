@@ -1,60 +1,66 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+const updateSchema = z.object({
+  hour: z.number().int().min(0).max(23).optional(),
+  minute: z.number().int().min(0).max(59).optional(),
+  durationSec: z.number().int().min(1).max(3600).optional(),
+  enabled: z.boolean().optional(),
+});
 
-  try {
-    const schedule = await prisma.wateringSchedule.findUnique({
-      where: { id: params.id },
-      include: { device: true },
-    });
-    if (!schedule || schedule.device.userId !== session.user.id) {
-      return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
-    }
-
-    await prisma.wateringSchedule.delete({ where: { id: params.id } });
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[DELETE /api/schedules/:id]", err);
-    return NextResponse.json({ error: "Gagal menghapus jadwal" }, { status: 500 });
-  }
+async function findOwnedSchedule(userId: string, scheduleId: string) {
+  const schedule = await prisma.wateringSchedule.findUnique({
+    where: { id: scheduleId },
+    include: { device: true },
+  });
+  if (!schedule || schedule.device.userId !== userId) return null;
+  return schedule;
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// PATCH /api/schedules/:id — update sebagian field (misal cuma toggle enabled)
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const { enabled } = await req.json();
-    const schedule = await prisma.wateringSchedule.findUnique({
-      where: { id: params.id },
-      include: { device: true },
-    });
-    if (!schedule || schedule.device.userId !== session.user.id) {
-      return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
-    }
-
-    const updated = await prisma.wateringSchedule.update({
-      where: { id: params.id },
-      data: { enabled },
-    });
-    return NextResponse.json({ ok: true, schedule: updated });
-  } catch (err) {
-    console.error("[PATCH /api/schedules/:id]", err);
-    return NextResponse.json({ error: "Gagal update jadwal" }, { status: 500 });
+  const userId = (session.user as { id: string }).id;
+  const existing = await findOwnedSchedule(userId, params.id);
+  if (!existing) {
+    return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
   }
+
+  const body = await req.json();
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Payload tidak valid" }, { status: 400 });
+  }
+
+  const updated = await prisma.wateringSchedule.update({
+    where: { id: params.id },
+    data: parsed.data,
+  });
+
+  return NextResponse.json({ schedule: updated });
+}
+
+// DELETE /api/schedules/:id
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = (session.user as { id: string }).id;
+  const existing = await findOwnedSchedule(userId, params.id);
+  if (!existing) {
+    return NextResponse.json({ error: "Jadwal tidak ditemukan" }, { status: 404 });
+  }
+
+  await prisma.wateringSchedule.delete({ where: { id: params.id } });
+
+  return NextResponse.json({ ok: true });
 }
